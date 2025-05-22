@@ -13,7 +13,7 @@ setup(
         'pandas>=2.2.2',
         'frozendict==2.4.6',
         'configobj>=5.0',
-        'sqlalchemy>=2.0',
+        'sqlalchemy>=1.3.15',
         'ete3>=3.0',
         'pysam>=0.19.1',
         'numpy>=1.20.0',
