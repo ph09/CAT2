@@ -1,4 +1,4 @@
-# OUT OF DATE AND WILL BE REPLACED SOON.
+# README IS OUT OF DATE AND WILL BE REPLACED SOON + NEW UPDATES.
 
 ![pipeline](https://github.com/ComparativeGenomicsToolkit/Comparative-Annotation-Toolkit/blob/master/img/cat-logo.png)
 
