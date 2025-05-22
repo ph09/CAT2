@@ -50,6 +50,10 @@ def augustus(args, coding_gp, toil_options):
                                                           args.annotation_gp)
             file_ids = [input_file_ids.genome_fasta, input_file_ids.coding_gp, input_file_ids.ref_psl,
                         input_file_ids.tm_psl, input_file_ids.annotation_gp]
+            if args.miniprot:
+                input_file_ids.miniprot_hints_gff = FileID.forPath(t.importFile('file://' + args.miniprot_hints_gff),
+                                                                  args.miniprot_hints_gff)
+                file_ids.append(args.miniprot_hints_gff)
             if args.augustus_tmr:
                 input_file_ids.augustus_hints_db = FileID.forPath(t.importFile('file://' + args.augustus_hints_db),
                                                                   args.augustus_hints_db)
@@ -134,12 +138,19 @@ def run_augustus_chunk(job, args, grouped_recs, input_file_ids, mode, cfg_file_i
         start = max(tm_tx.start - padding, 0)
         stop = min(tm_tx.stop + padding, len(genome_fasta[chromosome]))
         tm_hints = tools.tm2hints.tm_to_hints(tm_tx, tm_psl, ref_psl)
+        if args.miniprot:
+            local_mp_gff = job.fileStore.readGlobalFile(input_file_ids.miniprot_hints)
+            with open(local_mp_gff) as f:
+                miniprot_hints = f.read()
+            projection_hints = ''.join([tm_hints, miniprot_hints])
+        else:
+            projection_hints = tm_hints
         if args.augustus_tmr:
             rnaseq_hints = get_rnaseq_hints(args.genome, chromosome, start, stop, speciesnames, seqnames, hints,
                                             featuretypes, session)
-            hint = ''.join([tm_hints, rnaseq_hints])
+            hint = ''.join([projection_hints, rnaseq_hints])
         else:
-            hint = tm_hints
+            hint = projection_hints
         transcript = run_augustus(hint, genome_fasta, tm_tx, cfg_file, start, stop, args.augustus_species, mode,
                                   args.utr)
         if transcript is not None:

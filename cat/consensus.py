@@ -1,7 +1,7 @@
 """
 Generates consensus gene set.
 
-This module takes as input the genePreds produced by transMap, AugustusTM(R) and AugustusCGP and generates a consensus
+This module takes as input the genePreds produced by transMap, AugustusTM(R) and generates a consensus
 of these, producing a filtered gene set.
 
 This process relies on a combination of metrics and evaluations loaded to a sqlite database by the classify module.
@@ -62,7 +62,7 @@ def generate_consensus(args):
     tm_eval_df = load_transmap_evals(args.db_path)
     # load the homGeneMapping data for transMap/augTM/augTMR
     # pd.set_option('max_columns', None)
-    tx_modes = [x for x in args.tx_modes if x in ['transMap', 'augTM', 'augTMR']]
+    tx_modes = [x for x in args.tx_modes if x in ['transMap', 'augTM', 'augTMR', 'liftoff', 'stringTie']]
     if args.run_hgm == True:
         hgm_df = pd.concat([load_hgm_vectors(args.db_path, tx_mode) for tx_mode in tx_modes])
     else:
@@ -227,8 +227,7 @@ def calculate_vector_support(s, resolve_nan=None, num_digits=4):
 def load_hgm_vectors(db_path, tx_mode):
     """
     Loads the intron vector table output by the homGeneMapping module. Returns a DataFrame with the parsed vectors
-    as well as the combined score based on tx_mode -- for augCGP we look at the CDS annotation score rather than the
-    exon score because CGP has a coding-only model.
+    as well as the combined score based on tx_mode.
     """
     session = tools.sqlInterface.start_session(db_path)
     intron_table = tools.sqlInterface.tables['hgm'][tx_mode]
@@ -298,7 +297,7 @@ def load_evaluations_from_db(db_path, tx_mode):
 
 
 def load_alt_names(db_path, denovo_tx_modes):
-    """Load the alternative tx tables for augCGP/augPB"""
+    """Load the alternative tx tables for augPB"""
     session = tools.sqlInterface.start_session(db_path)
     r = []
     for tx_mode in denovo_tx_modes:
@@ -537,7 +536,7 @@ def find_novel(db_path, tx_dict, consensus_dict, ref_df, metrics, gene_biotype_m
 
     If the denovo_ignore_novel_genes flag is set, only incorporate PossibleParalog into the final consensus.
 
-    Also finds novel splice junctions in CGP/PB transcripts. A novel splice junction is defined as a splice which
+    Also finds novel splice junctions in PB transcripts. A novel splice junction is defined as a splice which
     homGeneMapping did not map over and which is supported by RNA-seq.
     """
     def is_novel(s):
@@ -572,7 +571,7 @@ def find_novel(db_path, tx_dict, consensus_dict, ref_df, metrics, gene_biotype_m
             return 'putative_novel'
 
     def is_novel_supported(s):
-        """Is this CGP/PB transcript with an assigned gene ID supported and have a novel splice?"""
+        """Is this PB transcript with an assigned gene ID supported and have a novel splice?"""
         denovo_tx_obj = tx_dict[s.AlignmentId]
         if len(denovo_tx_obj.intron_intervals) < denovo_num_introns:
             return None
@@ -603,9 +602,6 @@ def find_novel(db_path, tx_dict, consensus_dict, ref_df, metrics, gene_biotype_m
         return tx_class
 
     def has_novel_ends(s):
-        """Does this transcript have any novel ends we want to retain? Does not apply to augCGP"""
-        if tools.nameConversions.aln_id_is_cgp(s.AlignmentId):
-            return pd.Series([None, None, s.TranscriptClass])
         denovo_tx_obj = tx_dict[s.AlignmentId]
         five_p = denovo_tx_obj.get_5p_interval()
         three_p = denovo_tx_obj.get_3p_interval()
@@ -629,7 +625,24 @@ def find_novel(db_path, tx_dict, consensus_dict, ref_df, metrics, gene_biotype_m
 
     denovo_df['CommonName'] = [common_name_map.get(x, None) for x in denovo_df.AssignedGeneId]
     denovo_df['GeneBiotype'] = [gene_biotype_map.get(x, None) for x in denovo_df.AssignedGeneId]
-
+        
+    # if we have an external reference, try to incorporate those names as well
+    if 'stringTie' in denovo_tx_modes:
+        def add_stringtie_ids(s):
+            if s.AlignmentId in stringtie_common_name_map:
+                # if we have an assigned gene ID, defer the gene biotype to that but retain transcript biotype
+                if s.AssignedGeneId is None:
+                    return pd.Series([stringtie_common_name_map[s.AlignmentId], stringtie_gene_biotype_map[s.AlignmentId]])
+                else:
+                    return pd.Series([stringtie_common_name_map[s.AlignmentId], s.GeneBiotype])
+            # pass along the original data
+            return pd.Series([s.CommonName, s.GeneBiotype])
+        stringtie_annot = tools.sqlInterface.load_annotation(db_path)
+        stringtie_common_name_map = dict(list(zip(stringtie_annot.TranscriptId, stringtie_annot.GeneName)))
+        stringtie_gene_biotype_map = dict(list(zip(stringtie_annot.TranscriptId, stringtie_annot.GeneBiotype)))
+        denovo_df[['CommonName', 'GeneBiotype']] = denovo_df.apply(add_stringtie_ids, axis=1)
+        stringtie_annot = stringtie_annot.set_index('TranscriptId')
+    
     # if we have an external reference, try to incorporate those names as well
     if 'exRef' in denovo_tx_modes:
         def add_exref_ids(s):
@@ -844,7 +857,7 @@ def calculate_completeness(final_consensus, metrics):
     txs = collections.Counter()
     for aln_id, c in final_consensus:
         # don't count novel transcripts towards completeness
-        if tools.nameConversions.aln_id_is_cgp(aln_id) or tools.nameConversions.aln_id_is_pb(aln_id):
+        if tools.nameConversions.aln_id_is_pb(aln_id):
             continue
         genes[c['gene_biotype']].add(c['source_gene'])
         txs[c['transcript_biotype']] += 1
@@ -865,7 +878,7 @@ def calculate_improvement_metrics(final_consensus, scored_df, tm_eval_df, hgm_df
     for aln_id, c in final_consensus:
         if c['transcript_biotype'] != 'protein_coding':
             continue
-        elif 'exRef' in c['transcript_modes'] or 'augPB' in c['transcript_modes'] or 'augCGP' in c['transcript_modes']:
+        elif 'exRef' in c['transcript_modes'] or 'augPB' in c['transcript_modes'] or 'stringTie' in c['transcript_modes']:
             continue
         elif 'transMap' in c['transcript_modes']:
             metrics['Evaluation Improvement']['unchanged'] += 1

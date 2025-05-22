@@ -43,7 +43,7 @@ def augustus_pb(args, toil_options):
             input_file_ids.chrom_sizes = FileID.forPath(t.importFile('file://' + args.chrom_sizes), args.chrom_sizes)
             input_file_ids.pb_cfg = FileID.forPath(t.importFile('file://' + args.pb_cfg), args.pb_cfg)
             input_file_ids.hints_gff = FileID.forPath(t.importFile('file://' + args.hints_gff), args.hints_gff)
-            job = Job.wrapJobFn(setup, args, input_file_ids, memory='16G', disk='32G')
+            job = Job.wrapJobFn(setup, args, input_file_ids, memory='32G', disk='64G')
             raw_gtf_file_id, gtf_file_id, joined_gp_file_id = t.start(job)
         else:
             raw_gtf_file_id, gtf_file_id, joined_gp_file_id = t.restart()
@@ -58,8 +58,7 @@ def setup(job, args, input_file_ids):
     Entry function for running AugustusPB.
     The genome is chunked up and the resulting gene sets merged using joingenes.
     """
-    genome_fasta = tools.toilInterface.load_fasta_from_filestore(job, input_file_ids.genome_fasta,
-                                                                 prefix='genome', upper=False)
+    genome_fasta = tools.toilInterface.load_fasta_from_filestore(job, input_file_ids.genome_fasta, prefix='genome', upper=False)
 
     # load only PB hints
     hints_file = job.fileStore.readGlobalFile(input_file_ids.hints_gff)
@@ -104,11 +103,11 @@ def setup(job, args, input_file_ids):
                     tools.fileOps.print_row(outf, h)
             hints_file_id = job.fileStore.writeGlobalFile(tmp_hints)
             j = job.addChildJobFn(augustus_pb_chunk, args, input_file_ids, hints_file_id, chrom, start, stop,
-                                  memory='8G', disk='8G')
+                                  memory='32G', disk='32G')
             predictions.append(j.rv())
 
     # results contains a 3 member tuple of [raw_gtf_file_id, gtf_file_id, joined_gp_file_id]
-    results = job.addFollowOnJobFn(join_genes, predictions, memory='8G', disk='8G').rv()
+    results = job.addFollowOnJobFn(join_genes, predictions, memory='32G', disk='32G').rv()
     return results
 
 

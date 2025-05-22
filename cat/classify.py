@@ -1,5 +1,5 @@
 """
-A series of classifiers that evaluate transMap, AugustusTMR and AugustusCGP output.
+A series of classifiers that evaluate transMap, AugustusTMR output.
 
 These classifiers are broken down into 2 groups, which will each end up as a table in the database:
 
@@ -34,8 +34,7 @@ txMode:
 1) transMap
 2) augTM
 3) augTMR
-4) augCGP
-5) augPB
+4) augPB
 
 alnMode:
 1) CDS
@@ -74,7 +73,7 @@ def classify(eval_args):
     results = {}
     for tx_mode, path_dict in eval_args.transcript_modes.items():
         tx_dict = tools.transcripts.get_gene_pred_dict(path_dict['gp'])
-        aln_modes = ['CDS', 'mRNA'] if tx_mode != 'augCGP' else ['CDS']
+        aln_modes = ['CDS', 'mRNA'] 
         for aln_mode in aln_modes:
             psl_iter = list(tools.psl.psl_iterator(path_dict[aln_mode]))
             mc_df = metrics_classify(aln_mode, ref_tx_dict, tx_dict, tx_biotype_map, psl_iter, seq_dict)

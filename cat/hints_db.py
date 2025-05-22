@@ -1,5 +1,5 @@
 """
-Generate a hints database file from RNAseq/IsoSeq alignments for AugustusTMR/AugustusCGP.
+Generate a hints database file from RNAseq/IsoSeq alignments for AugustusTMR.
 """
 import collections
 import itertools
@@ -109,7 +109,7 @@ def setup_hints(job, input_file_ids):
         for original_path, (bam_file_id, bai_file_id) in bam_dict.items():
             for reference_subset in grouped_references:
                 j = job.addChildJobFn(namesort_bam, bam_file_id, bai_file_id, reference_subset, disk_usage,
-                                      disk=disk_usage, cores=4, memory='16G')
+                                      disk=disk_usage, cores=16, memory='64G')
                 filtered_bam_file_ids[dtype][reference_subset].append(j.rv())
 
     # IsoSeq hints
@@ -161,7 +161,7 @@ def namesort_bam(job, bam_file_id, bai_file_id, reference_subset, disk_usage, nu
     name_sorted = tools.fileOps.get_tmp_toil_file(suffix='name_sorted.bam')
     cmd = [['samtools', 'view', '-b', bam_path] + list(reference_subset),
            ['sambamba', 'sort', '--tmpdir={}'.format(job.fileStore.getLocalTempDir()),
-            '-t', '4', '-m', '15G', '-o', '/dev/stdout', '-n', '/dev/stdin']]
+            '-t', '16', '-m', '63G', '-o', '/dev/stdout', '-n', '/dev/stdin']]
     tools.procOps.run_proc(cmd, stdout=name_sorted)
     ns_handle = pysam.Samfile(name_sorted)
     # this group may come up empty -- check to see if we have at least one mapped read
@@ -177,15 +177,15 @@ def namesort_bam(job, bam_file_id, bai_file_id, reference_subset, disk_usage, nu
         r.extend(list(reads))
         if len(r) >= num_reads:
             file_id = write_bam(r, ns_handle)
-            j = job.addChildJobFn(filter_bam, file_id, is_paired, disk='4G', memory='2G')
+            j = job.addChildJobFn(filter_bam, file_id, is_paired, disk='16G', memory='8G')
             filtered_file_ids.append(j.rv())
             r = []
     # do the last bin, if its non-empty
     if len(r) > 0:
         file_id = write_bam(r, ns_handle)
-        j = job.addChildJobFn(filter_bam, file_id, is_paired, disk='4G', memory='2G')
+        j = job.addChildJobFn(filter_bam, file_id, is_paired, disk='16G', memory='8G')
         filtered_file_ids.append(j.rv())
-    return job.addFollowOnJobFn(merge_filtered_bams, filtered_file_ids, disk=disk_usage, memory='16G').rv()
+    return job.addFollowOnJobFn(merge_filtered_bams, filtered_file_ids, disk=disk_usage, memory='64G').rv()
 
 
 def filter_bam(job, file_id, is_paired):
@@ -204,7 +204,7 @@ def filter_bam(job, file_id, is_paired):
         raise RuntimeError('After filtering one BAM subset became empty. This could be bad.')
 
     out_filter = tools.fileOps.get_tmp_toil_file()
-    sort_cmd = ['sambamba', 'sort', tmp_filtered, '-o', out_filter, '-t', '1']
+    sort_cmd = ['sambamba', 'sort', tmp_filtered, '-o', out_filter, '-t', '4']
     tools.procOps.run_proc(sort_cmd)
     return job.fileStore.writeGlobalFile(out_filter)
 
@@ -240,7 +240,7 @@ def merge_bams(job, filtered_bam_file_ids, annotation_hints_file_id, iso_seq_hin
             if len(file_ids) > 0:
                 disk_usage = tools.toilInterface.find_total_disk_usage(file_ids)
                 merged_bam_file_ids[dtype][ref_group] = job.addChildJobFn(cat_sort_bams, file_ids, disk=disk_usage,
-                                                                          memory='16G', cores=4).rv()
+                                                                          memory='64G', cores=16).rv()
     return job.addFollowOnJobFn(build_hints, merged_bam_file_ids, annotation_hints_file_id, iso_seq_hints_file_ids,
                                 protein_hints_file_id).rv()
 
@@ -271,7 +271,7 @@ def cat_sort_bams(job, bam_file_ids):
 
     # combine and merge
     merged = tools.fileOps.get_tmp_toil_file()
-    cmd = ['sambamba', 'sort', catfile, '-o', merged, '-t', '4', '-m', '15G']
+    cmd = ['sambamba', 'sort', catfile, '-o', merged, '-t', '16', '-m', '63G']
     tools.procOps.run_proc(cmd)
     return job.fileStore.writeGlobalFile(merged)
 
@@ -288,10 +288,10 @@ def generate_protein_hints(job, protein_fasta_file_id, genome_fasta_file_id):
     # group up proteins for sub-jobs
     results = []
     for chunk in tools.dataOps.grouper(protein_handle.items(), 100):
-        j = job.addChildJobFn(run_protein_aln, chunk, genome_fasta_file_id, disk=disk_usage, memory='8G')
+        j = job.addChildJobFn(run_protein_aln, chunk, genome_fasta_file_id, disk=disk_usage, memory='32G')
         results.append(j.rv())
     # return merged results
-    return job.addFollowOnJobFn(convert_protein_aln_results_to_hints, results, memory='8G').rv()
+    return job.addFollowOnJobFn(convert_protein_aln_results_to_hints, results, memory='32G').rv()
 
 
 def run_protein_aln(job, protein_subset, genome_fasta_file_id):

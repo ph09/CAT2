@@ -50,7 +50,7 @@ def align_transcripts(args, toil_options):
                 input_file_ids.modes[mode] = t.importFile('file://' + args.transcript_modes[mode]['gp'])
                 file_ids.append(input_file_ids.modes[mode])
             disk_usage = tools.toilInterface.find_total_disk_usage(file_ids)
-            job = Job.wrapJobFn(setup, args, input_file_ids, memory='16G', disk=disk_usage)
+            job = Job.wrapJobFn(setup, args, input_file_ids, memory='64G', disk=disk_usage)
             results_file_ids = t.start(job)
         else:
             results_file_ids = t.restart()
@@ -79,7 +79,7 @@ def setup(job, args, input_file_ids):
     ref_transcript_dict = tools.transcripts.get_gene_pred_dict(annotation_gp)
     # will hold a mapping of output file paths to lists of Promise objects containing output
     results = collections.defaultdict(list)
-    for tx_mode in ['transMap', 'augTM', 'augTMR']:
+    for tx_mode in ['transMap', 'augTM', 'augTMR', 'liftoff', 'stringTie']:
         if tx_mode not in args.transcript_modes:
             continue
         # output file paths
@@ -94,14 +94,14 @@ def setup(job, args, input_file_ids):
             seq_iter = get_alignment_sequences(transcript_dict, ref_transcript_dict, genome_fasta,
                                                ref_genome_fasta, aln_mode)
             for chunk in group_transcripts(seq_iter):
-                j = job.addChildJobFn(run_aln_chunk, chunk, memory='8G', disk='2G')
+                j = job.addChildJobFn(run_aln_chunk, chunk, memory='32G', disk='16G')
                 results[out_path].append(j.rv())
 
     if len(results) == 0:
         err_msg = 'Align Transcripts pipeline did not detect any input genePreds for {}'.format(args.genome)
         raise RuntimeError(err_msg)
     # convert the results Promises into resolved values
-    return job.addFollowOnJobFn(merge, results, args, memory='8G', disk='4G').rv()
+    return job.addFollowOnJobFn(merge, results, args, memory='32G', disk='16G').rv()
 
 
 def get_alignment_sequences(transcript_dict, ref_transcript_dict, genome_fasta, ref_genome_fasta, mode):

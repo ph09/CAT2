@@ -37,10 +37,10 @@ def main(args):
             num_discarded += 1
             continue
 
-        gene_id = tx.attributes["geneID"][0]
+        gene_id = tx.attributes.get("gene_id", tx.attributes.get("geneID", ["unknown_gene"]))[0]
         seen_genes.add(gene_id)
         tot_transcripts += 1
-        tx_id = tx.attributes["ID"][0]
+        tx_id = tx.attributes.get("ID", tx.attributes.get("transcript_id", ["unknown_tx"]))[0]
         biotype = args.noncoding_biotype if len(cds) == 0 else args.coding_biotype
 
         add_qualifiers(tx, gene_id, tx_id, biotype)

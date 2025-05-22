@@ -69,9 +69,9 @@ def setup(job, args, input_file_ids):
                                                                     input_file_ids.query_two_bit])
             # silly heuristic for chaining -- if the chrom is over 10mb, use 16G, otherwise use 8G
             if size >= 10000000:
-                memory = '16G'
+                memory = '32G'
             else:
-                memory = '8G'
+                memory = '16G'
             j = job.addChildJobFn(chain_by_chromosome, args, chrom, size, input_file_ids, target_genome,
                                   target_two_bit_file_id, memory=memory, disk=disk_usage)
             tmp_chain_file_ids[target_genome].append(j.rv())
@@ -79,7 +79,7 @@ def setup(job, args, input_file_ids):
     return_file_ids = {}
     for genome, chain_file in args.chain_files.items():
         chain_files = tmp_chain_file_ids[genome]
-        j = job.addFollowOnJobFn(merge, chain_files, genome, memory='8G', disk='8G')
+        j = job.addFollowOnJobFn(merge, chain_files, genome, memory='32G', disk='32G')
         return_file_ids[chain_file] = j.rv()
     return return_file_ids
 

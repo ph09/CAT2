@@ -1,5 +1,5 @@
 """
-A set of functions to perform parental gene assignment in the AugustusPB/AugustusCGP modules
+A set of functions to perform parental gene assignment in the AugustusPB modules
 """
 import pandas as pd
 import itertools

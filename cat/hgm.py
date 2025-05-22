@@ -58,7 +58,7 @@ def hgm(args):
                 else:
                     tools.fileOps.print_row(outf, [genome, gtf, supplementary_gff])
                 supplementary_gffs.append(supplementary_gff)
-            if args.ref_genome not in args.in_gtf:  # we are not running CGP, and so have no GTF for the reference
+            if args.ref_genome not in args.in_gtf:  
                 dummy_gtf = tools.fileOps.get_tmp_file()
                 tools.fileOps.touch(dummy_gtf)
                 supplementary_gff = create_supplementary_gff(args.hints_db, args.annotation_gtf, args.ref_genome,
@@ -92,7 +92,7 @@ def create_supplementary_gff(hints_db, in_gtf, genome, annotation_gp=None):
     Creates the supplementary GFF which contains exon hints derived from the database as well as non-coding introns
     and all exons if annotation_gp is passed.
     :param hints_db: path to the hints database
-    :param in_gtf: GTF file for this genome. If we are not doing this on CGP results, and this is the reference genome,
+    :param in_gtf: GTF file for this genome. If this is the reference genome,
     this will be the annotation GTF.
     :param genome: current genome
     :param annotation_gp: annotation genePred, if we have one
@@ -227,7 +227,7 @@ def parse_hgm_gtf(hgm_out, genome):
     cds_lines = []
     exon_lines = []
     species_map = {}
-    seen_lines = set()  # filter out duplicate lines. Happens in CGP/PB.
+    seen_lines = set()
     with open(hgm_out) as infile:
         for line in infile:
             if line in seen_lines:
