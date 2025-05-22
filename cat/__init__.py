@@ -571,7 +571,7 @@ class ToilTask(PipelineTask):
         :return: dict
         """
         parser = Job.Runner.getDefaultArgumentParser()
-        namespace = parser.parse_args([''])  # empty jobStore attribute
+        namespace = parser.parse_args([])  # empty jobStore attribute
         namespace.jobStore = None  # jobStore attribute will be updated per-batch
         namespace.logLevel = self.logLevel
         return namespace
