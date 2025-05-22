@@ -62,7 +62,7 @@ def generate_consensus(args):
     tm_eval_df = load_transmap_evals(args.db_path)
     # load the homGeneMapping data for transMap/augTM/augTMR
     # pd.set_option('max_columns', None)
-    tx_modes = [x for x in args.tx_modes if x in ['transMap', 'augTM', 'augTMR', 'liftoff', 'stringTie']]
+    tx_modes = [x for x in args.tx_modes if x in ['transMap', 'augTM', 'augTMR']]
     if args.run_hgm == True:
         hgm_df = pd.concat([load_hgm_vectors(args.db_path, tx_mode) for tx_mode in tx_modes])
     else:
@@ -627,23 +627,6 @@ def find_novel(db_path, tx_dict, consensus_dict, ref_df, metrics, gene_biotype_m
     denovo_df['GeneBiotype'] = [gene_biotype_map.get(x, None) for x in denovo_df.AssignedGeneId]
         
     # if we have an external reference, try to incorporate those names as well
-    if 'stringTie' in denovo_tx_modes:
-        def add_stringtie_ids(s):
-            if s.AlignmentId in stringtie_common_name_map:
-                # if we have an assigned gene ID, defer the gene biotype to that but retain transcript biotype
-                if s.AssignedGeneId is None:
-                    return pd.Series([stringtie_common_name_map[s.AlignmentId], stringtie_gene_biotype_map[s.AlignmentId]])
-                else:
-                    return pd.Series([stringtie_common_name_map[s.AlignmentId], s.GeneBiotype])
-            # pass along the original data
-            return pd.Series([s.CommonName, s.GeneBiotype])
-        stringtie_annot = tools.sqlInterface.load_annotation(db_path)
-        stringtie_common_name_map = dict(list(zip(stringtie_annot.TranscriptId, stringtie_annot.GeneName)))
-        stringtie_gene_biotype_map = dict(list(zip(stringtie_annot.TranscriptId, stringtie_annot.GeneBiotype)))
-        denovo_df[['CommonName', 'GeneBiotype']] = denovo_df.apply(add_stringtie_ids, axis=1)
-        stringtie_annot = stringtie_annot.set_index('TranscriptId')
-    
-    # if we have an external reference, try to incorporate those names as well
     if 'exRef' in denovo_tx_modes:
         def add_exref_ids(s):
             if s.AlignmentId in exref_common_name_map:
@@ -878,7 +861,7 @@ def calculate_improvement_metrics(final_consensus, scored_df, tm_eval_df, hgm_df
     for aln_id, c in final_consensus:
         if c['transcript_biotype'] != 'protein_coding':
             continue
-        elif 'exRef' in c['transcript_modes'] or 'augPB' in c['transcript_modes'] or 'stringTie' in c['transcript_modes']:
+        elif 'exRef' in c['transcript_modes'] or 'augPB' in c['transcript_modes']:
             continue
         elif 'transMap' in c['transcript_modes']:
             metrics['Evaluation Improvement']['unchanged'] += 1
